@@ -2,6 +2,10 @@
 ##### BUILD
 build/
 
+##### Credentials
+credentials.json
+token.pickle
+
 
 ##### VIM
 
