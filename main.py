@@ -33,6 +33,7 @@ class Policy():
 class Schedule():
     def __init__(self):
         self.appointment_slot_size = datetime.timedelta(minutes=20)
+        self.timezone = datetime.timezone(-datetime.timedelta(hours=5))
         self.availability = {
             1 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
             2 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
@@ -126,6 +127,12 @@ class Calendar():
     def iso_str_to_naive_dt(self, s):
         return datetime.datetime.fromisoformat(s).replace(tzinfo=None)
 
+    def utc_dt_to_iso_str(self, dt):
+        return dt.isoformat()+'Z'
+
+    def naive_dt_to_iso_str(self, dt):
+        return dt.replace(tzinfo=self.schedule.timezone).isoformat()
+
     def rotate_schedule_today_index(self, schedule):
         today = datetime.date.today()
         return (
@@ -150,7 +157,7 @@ class Calendar():
                 ret[weekday]["appts"].append((
                     slot["start"].strftime("%-I:%M %p"),
                     slot["booked"]))
-                ret[weekday]["date"] = slot["start"].strftime("%-m/%d")
+                ret[weekday]["date"] = slot["start"].strftime("%-m/%d/%y")
         return self.rotate_schedule_today_index(ret)
 
     def build_schedule(self):
@@ -161,11 +168,11 @@ class Calendar():
 
         # Lookup existing appointments in gcal
         appointments = self.service.events().list(
-            calendarId=self.calendar_id,
-            timeMin=now_utc_dt.isoformat()+'Z',
-            timeMax=next_week_utc_dt.isoformat()+'Z',
-            singleEvents=True,
-            orderBy='startTime').execute().get('items', [])
+            calendarId = self.calendar_id,
+            timeMin = self.utc_dt_to_iso_str(now_utc_dt),
+            timeMax = self.utc_dt_to_iso_str(next_week_utc_dt),
+            singleEvents = True,
+            orderBy = 'startTime').execute().get('items', [])
 
         #Compute all possible appointment slots for the week
         slots = self.schedule.calc_appointment_slots()
@@ -175,13 +182,6 @@ class Calendar():
             a_start = self.iso_str_to_naive_dt(event['start']['dateTime'])
             a_end   = self.iso_str_to_naive_dt(event['end']['dateTime'])
 
-            #end = event['end'].get('dateTime', event['end'].get('date'))
-            #
-            #start = datetime.datetime.fromisoformat(
-            #        event['start'].get('dateTime', event['start'].get('date'))
-            #    ).replace(tzinfo=None)
-
-            #appt_end = (datetime.datetime.fromisoformat(end)).replace(tzinfo=None)
             for slot in slots[a_start.isoweekday()]:
                 s_start = slot["start"]
                 s_end   = slot["start"] + slot["len"]
@@ -192,16 +192,71 @@ class Calendar():
                     (s_start <= a_start and a_end <= s_end) or
                     (s_start <= now_dt))
 
-        return self.format_schedule(slots)
+        return slots
 
 
-    def has_appointment(self, email, netid):
-        pass
+    def lookup_appointment_request(self, start_time):
+        schedule = self.build_schedule()
+        start_time_dt = datetime.datetime.strptime(
+            start_time, "%m/%d/%y %I:%M %p")
+
+        for slot in schedule[start_time_dt.isoweekday()]:
+            if slot["start"] == start_time_dt:
+                return slot
+
+        return None
+
+
+
+    def num_appointments(self, email):
+        user = email[:email.find("@")]
+        #TODO
+        return 0
 
     def book_appointment(self, start_time, email, name):
         user = email[:email.find("@")]
-        email_domain = email[email.find("@"):]
 
+        if(start_time is None or email is None or name is None):
+            return (False, "Error")
+
+        if(not self.policy.is_email_allowed(email)):
+            return (False, "Email not allowed")
+
+        if( self.num_appointments(email) >=
+            self.policy.max_appointments_per_person):
+            return (False, "Too many appointments")
+
+        slot = self.lookup_appointment_request(start_time)
+        if(slot is None or slot["booked"]):
+            return (False, "That time in not available")
+
+
+        result = self.service.events().insert(
+            calendarId = self.calendar_id,
+            conferenceDataVersion = 1,
+            sendUpdates = "all",
+            body={
+                "summary" : "323 Appointment with " + name,
+                "description" : "Please come prepared with information about how you have been debugging, what the problem is, what you have tried to do so far, etc.",
+                "start" : {
+                    "dateTime":self.naive_dt_to_iso_str(slot["start"]),
+                    "timeZone": "America/New_York",
+                },
+                "end" : {
+                    "dateTime":self.naive_dt_to_iso_str(
+                        slot["start"]+slot["len"]),
+                    "timeZone": "America/New_York",
+                },
+                "organizer" : {
+                    "self" : True,
+                },
+                "attendees" : [{
+                    "displayName":name,
+                    "email":email,
+                }],
+            }).execute()
+
+        return (True, "Appointment booked: " + result.get("htmlLink"))
 
 
 
@@ -216,12 +271,13 @@ def main():
     @app.route("/", methods=['GET','POST'])
     def index():
         if (request.method == 'POST'):
-            gcal.book_appointment(
+            success, message = gcal.book_appointment(
                 request.form.get('appt'),
                 request.form.get('email'),
                 request.form.get('name'))
+            print(message)
 
-        schedule = gcal.build_schedule()
+        schedule = gcal.format_schedule(gcal.build_schedule())
 
         return render_template("index.html",
             today=datetime.date.today().strftime("%a"),
