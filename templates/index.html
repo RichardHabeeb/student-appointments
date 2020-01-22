@@ -9,90 +9,102 @@
     </head>
     <body>
         <div class="container">
-            <div class="row">
-                <div class="col s12">
-                    <h2>Book an Appointment</h1>
-                    <h5>with the 323 ULAs</h2>
+            <form action='#' method='post'>
+                <div class="row">
+                    <div class="col s12">
+                        <h2>Book an Appointment</h1>
+                        <h5>with the 323 ULAs</h2>
+                    </div>
                 </div>
-            </div>
-            <div class="row">
-                <div class="input-field col s12">
-                    <input placeholder="" id="name" type="text" class="validate">
-                    <label for="name">Preferred Name</label>
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input name="name" type="text" class="validate">
+                        <label for="name">Preferred Name</label>
+                    </div>
                 </div>
-            </div>
-            <div class="row">
-                <div class="input-field col s12">
-                    <input id="email" type="email" class="validate">
-                    <label for="email">Email</label>
-                </div>
-            </div>
-
-            <div class="row">
-
-                <div class="col s6">
-                    <div class="row">
-                        <div class="col s3"></div>
-                        {% for day in schedule1 %}
-                        <div class="col s3">
-                            <div class="row">
-                                <div class="col s12">
-                                    <b>{{ day["name"] }}</b><br>
-                                    {{ day["date"] }}
-                                </div>
-                            </div>
-                            {% for appt in day["appts"] %}
-                            <div class="row">
-                                <label class="col s12">
-                                    {% if appt[1] %}
-                                    <input type="radio" name="appt" disabled="disabled"/>
-                                    {% else %}
-                                    <input type="radio" name="appt" />
-                                    {% endif %}
-                                    <span>{{ appt[0] }}</span>
-                                </label>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endfor %}
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input name="email" type="email" class="validate">
+                        <label for="email">Yale Email</label>
                     </div>
                 </div>
 
-                <div class="col s6">
-                    <div class="row">
-                        {% for day in schedule2 %}
-                        <div class="col s3">
-                            <div class="row">
-                                <div class="col s12">
-                                    <b>{{ day["name"] }}</b><br>
-                                    {{ day["date"] }}
+                <div class="row">
+
+                    <!-- CALENDAR LEFT HALF -->
+                    <div class="col s6">
+                        <div class="row">
+                            <div class="col s3"></div>
+                            {% for day in schedule1 %}
+                            <div class="col s3">
+                                <div class="row">
+                                    <div class="col s12">
+                                        <b>{{ day["name"] }}</b><br>
+                                        {{ day["date"] }}
+                                    </div>
                                 </div>
-                            </div>
-                            {% for appt in day["appts"] %}
-                            <div class="row">
-                                <label class="col s12">
-                                    {% if appt[1] %}
-                                    <input type="radio" name="appt" disabled="disabled"/>
-                                    {% else %}
-                                    <input type="radio" name="appt" />
-                                    {% endif %}
-                                    <span>{{ appt[0] }}</span>
-                                </label>
+                                {% for appt in day["appts"] %}
+                                <div class="row">
+                                    <label class="col s12">
+                                        <input
+                                            type="radio"
+                                            name="appt"
+                                            value="{{ day['date'] }} {{ appt[0] }}"
+                                            {% if appt[1] %}
+                                            disabled="disabled"
+                                            {% else %}
+                                            {% endif %}
+                                        />
+                                        <span>{{ appt[0] }}</span>
+                                    </label>
+                                </div>
+                                {% endfor %}
                             </div>
                             {% endfor %}
                         </div>
-                        {% endfor %}
+                    </div>
+
+                    <!-- CALENDAR RIGHT HALF -->
+                    <div class="col s6">
+                        <div class="row">
+                            {% for day in schedule2 %}
+                            <div class="col s3">
+                                <div class="row">
+                                    <div class="col s12">
+                                        <b>{{ day["name"] }}</b><br>
+                                        {{ day["date"] }}
+                                    </div>
+                                </div>
+                                {% for appt in day["appts"] %}
+                                <div class="row">
+                                    <label class="col s12">
+                                        <input
+                                            type="radio"
+                                            name="appt"
+                                            value="{{ day['date'] }} {{ appt[0] }}"
+                                            {% if appt[1] %}
+                                            disabled="disabled"
+                                            {% else %}
+                                            {% endif %}
+                                        />
+                                        <span>{{ appt[0] }}</span>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                </div>
+                <div class="row">
+                    <div class="col s12">
+                        <button class="btn waves-effect waves-light" type="submit">Make Booking
+                            <i class="material-icons right">perm_contact_calendar</i>
+                        </button>
                     </div>
                 </div>
-
-            </div>
-            <div class="row">
-                <div class="col s12">
-                    <button class="btn waves-effect waves-light" type="submit">Make Booking
-                        <i class="material-icons right">perm_contact_calendar</i>
-                    </button>
-                </div>
-            </div>
+            </form>
         </div>
         <script type="text/javascript" src="static/js/materialize.min.js"></script>
     </body>
