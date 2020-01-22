@@ -24,7 +24,7 @@ class Constants():
 class Policy():
     def __init__(self):
         self.max_appointments_per_person = 1
-        self.allowed_email_domains = ["yale.edu", "bulldogs.yale.edu"]
+        self.allowed_email_domains = ["yale.edu"]
 
     def is_email_allowed(self, email):
         return (self.allowed_email_domains is None or
@@ -34,6 +34,7 @@ class Schedule():
     def __init__(self):
         self.appointment_slot_size = datetime.timedelta(minutes=20)
         self.timezone = datetime.timezone(-datetime.timedelta(hours=5))
+        self.iana_tz = "America/New_York"
         self.availability = {
             1 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
             2 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
@@ -77,6 +78,7 @@ class Schedule():
                         "start" : appointment_start,
                         "len": self.appointment_slot_size,
                         "booked":False,
+                        "attendees": [],
                     })
                     appointment_start += self.appointment_slot_size
         return slots
@@ -161,7 +163,6 @@ class Calendar():
         return self.rotate_schedule_today_index(ret)
 
     def build_schedule(self):
-        # 'Z' indicates UTC time
         now_utc_dt = datetime.datetime.utcnow()
         now_dt = datetime.datetime.now()
         next_week_utc_dt = now_utc_dt + datetime.timedelta(days=7)
@@ -186,11 +187,19 @@ class Calendar():
                 s_start = slot["start"]
                 s_end   = slot["start"] + slot["len"]
 
-                slot["booked"] = (
+                attendees = [a["email"] for a in event["attendees"]
+                                if a["responseStatus"] != "declined"]
+
+                if(len(attendees) == 0):
+                    continue
+
+                slot["booked"] |= (
                     (a_start < s_end and s_end <= a_end) or
                     (a_start <= s_start and s_start < a_end) or
                     (s_start <= a_start and a_end <= s_end) or
                     (s_start <= now_dt))
+                if slot["booked"]:
+                    slot["attendees"] += attendees
 
         return slots
 
@@ -209,9 +218,25 @@ class Calendar():
 
 
     def num_appointments(self, email):
-        user = email[:email.find("@")]
-        #TODO
-        return 0
+        now_utc_dt = datetime.datetime.utcnow()
+        now_dt = datetime.datetime.now()
+        next_week_utc_dt = now_utc_dt + datetime.timedelta(days=7)
+
+        # Lookup existing appointments in gcal
+        appointments = self.service.events().list(
+            calendarId = self.calendar_id,
+            timeMin = self.utc_dt_to_iso_str(now_utc_dt),
+            timeMax = self.utc_dt_to_iso_str(next_week_utc_dt),
+            singleEvents = True,
+            orderBy = 'startTime').execute().get('items', [])
+
+        count = 0
+        for event in appointments:
+            attendees = [a["email"] for a in event["attendees"]
+                            if a["responseStatus"] != "declined"]
+            count += 1 if email in attendees else 0
+        return count
+
 
     def book_appointment(self, start_time, email, name):
         user = email[:email.find("@")]
@@ -220,15 +245,15 @@ class Calendar():
             return (False, "Error")
 
         if(not self.policy.is_email_allowed(email)):
-            return (False, "Email not allowed")
+            return (False, "Email not allowed, please use a @yale.edu address")
 
         if( self.num_appointments(email) >=
             self.policy.max_appointments_per_person):
-            return (False, "Too many appointments")
+            return (False, "You have too many scheduled appointments, please cancel to book more.")
 
         slot = self.lookup_appointment_request(start_time)
         if(slot is None or slot["booked"]):
-            return (False, "That time in not available")
+            return (False, "That time in not available.")
 
 
         result = self.service.events().insert(
@@ -240,12 +265,12 @@ class Calendar():
                 "description" : "Please come prepared with information about how you have been debugging, what the problem is, what you have tried to do so far, etc.",
                 "start" : {
                     "dateTime":self.naive_dt_to_iso_str(slot["start"]),
-                    "timeZone": "America/New_York",
+                    "timeZone": self.schedule.iana_tz
                 },
                 "end" : {
                     "dateTime":self.naive_dt_to_iso_str(
                         slot["start"]+slot["len"]),
-                    "timeZone": "America/New_York",
+                    "timeZone": self.schedule.iana_tz
                 },
                 "organizer" : {
                     "self" : True,
@@ -256,9 +281,7 @@ class Calendar():
                 }],
             }).execute()
 
-        return (True, "Appointment booked: " + result.get("htmlLink"))
-
-
+        return (True, "Appointment booked.")
 
 
 
@@ -270,19 +293,26 @@ def main():
 
     @app.route("/", methods=['GET','POST'])
     def index():
+
+        show_message = False
+        success = False
+        message = ""
         if (request.method == 'POST'):
             success, message = gcal.book_appointment(
                 request.form.get('appt'),
                 request.form.get('email'),
                 request.form.get('name'))
-            print(message)
+            show_message = True
 
         schedule = gcal.format_schedule(gcal.build_schedule())
 
         return render_template("index.html",
             today=datetime.date.today().strftime("%a"),
             schedule1=schedule[:3],
-            schedule2=schedule[3:])
+            schedule2=schedule[3:],
+            show_message=show_message,
+            success=success,
+            message=message)
 
     gcal.connect('CPSC 323 Office Hours Appointments')
     app.run()
