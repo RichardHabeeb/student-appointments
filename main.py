@@ -33,16 +33,27 @@ class Policy():
 class Schedule():
     def __init__(self):
         self.appointment_slot_size = datetime.timedelta(minutes=20)
+        #TODO: read from config json
         self.timezone = datetime.timezone(-datetime.timedelta(hours=5))
         self.iana_tz = "America/New_York"
         self.availability = {
-            1 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
-            2 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
-            3 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
-            4 : [(datetime.time(hour=18), datetime.timedelta(hours=6))],
-            5 : [],
-            6 : [],
-            7 : [(datetime.time(hour=21), datetime.timedelta(hours=3))],
+            #mon
+            1 : [(datetime.time(hour=16), datetime.timedelta(hours=2))],
+            #tues
+            2 : [(datetime.time(hour=9),  datetime.timedelta(hours=3)),
+                 (datetime.time(hour=15), datetime.timedelta(hours=3))],
+            #wed
+            3 : [(datetime.time(hour=15), datetime.timedelta(hours=3))],
+            #thurs
+            4 : [(datetime.time(hour=18), datetime.timedelta(hours=3))],
+            #fri
+            5 : [(datetime.time(hour=9),  datetime.timedelta(hours=3)),
+                 (datetime.time(hour=15), datetime.timedelta(hours=9))],
+            #sat
+            6 : [(datetime.time(hour=9),  datetime.timedelta(hours=3)),
+                 (datetime.time(hour=15), datetime.timedelta(hours=3))],
+            #sun
+            7 : [(datetime.time(hour=18), datetime.timedelta(hours=3))],
         }
 
     def calc_week_dates(self):
